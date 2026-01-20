@@ -1,0 +1,84 @@
+[config]
+type = "pipeline"
+chartbook_format_version = "0.0.2"
+
+[site]
+title = "Treasury-SF Basis"
+author = "Jeremy Bejarano"
+copyright = "2025"
+logo_path = ""
+favicon_path = ""
+
+[pipeline]
+id = "basis_treas_sf"
+pipeline_name = "Treasury-Secured Financing Basis"
+pipeline_description = "Treasury-SF basis measuring the spread between Treasury yields and SOFR-based secured financing rates"
+lead_pipeline_developer = "Jeremy Bejarano"
+contributors = ["Jeremy Bejarano"]
+runs_on = "Windows/Linux/MacOS (requires Bloomberg)"
+git_repo_URL = "https://github.com/ftsfr/basis_treas_sf"
+README_file_path = "./README.md"
+
+[notebooks]
+
+[notebooks.summary_treasury_sf_basis]
+notebook_name = "summary_treasury_sf_basis"
+notebook_description = "Summary statistics and visualization of Treasury-SF basis"
+notebook_path = "_output/_notebook_build/summary_treasury_sf_basis.ipynb"
+is_publishable = true
+
+[charts]
+
+[dataframes]
+
+[dataframes.ftsfr_treasury_sf_basis]
+dataframe_name = "ftsfr_treasury_sf_basis"
+short_description_df = "Daily Treasury-SF basis spreads for 5 tenors"
+data_sources = ["Bloomberg Treasury Yields", "Bloomberg SOFR OIS Rates"]
+data_providers = ["Bloomberg"]
+need_to_contact_provider = ["no"]
+data_on_pre_approved_list = ["No"]
+links_to_data_providers = ["https://bloomberg.com"]
+topic_tags = ["Treasury", "SOFR", "secured financing", "basis", "fixed income"]
+type_of_data_access = ["Bloomberg Terminal"]
+data_license = "Bloomberg"
+license_expiration_date = ""
+provider_contact_info = ""
+restriction_on_use = "No"
+how_is_pulled = "Pulled from Bloomberg via xbbg"
+path_to_parquet_data = "./_data/ftsfr_treasury_sf_basis.parquet"
+path_to_excel_data = ""
+date_col = "ds"
+dataframe_docs_str = """
+## Treasury-SF Basis
+
+Treasury-Secured Financing basis spreads in basis points.
+
+### Columns
+
+| Column | Description |
+|--------|-------------|
+| unique_id | Tenor identifier (e.g., Treasury_SF_2Y, Treasury_SF_10Y) |
+| ds | Date |
+| y | Basis spread in basis points |
+
+### Methodology
+
+$$
+\\text{Basis} = (\\text{Treasury Yield} - \\text{SOFR OIS Rate}) \\times 100
+$$
+
+### Interpretation
+
+- Basis > 0: Treasuries yield more than SOFR-based financing
+- Basis < 0: SOFR-based financing yields more than Treasuries
+- Basis = 0: No spread
+
+### Series
+
+Treasury_SF_2Y, Treasury_SF_5Y, Treasury_SF_10Y, Treasury_SF_20Y, Treasury_SF_30Y
+
+### Data Source
+
+Bloomberg Treasury constant maturity yields (USGG series) and SOFR OIS swap rates (USOSFR series)
+"""

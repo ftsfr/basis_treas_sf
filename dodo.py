@@ -16,23 +16,33 @@ sys.path.insert(1, "./src/")
 
 # Bloomberg Terminal check - runs at module load time
 def _check_bloomberg_terminal():
-    """Check Bloomberg Terminal availability with env var override."""
-    # Skip prompt if environment variable is set
+    """Check Bloomberg Terminal availability.
+
+    Supports:
+    - SKIP_BLOOMBERG=1 env var to skip pull without prompt (for batch/CI use)
+    - BLOOMBERG_TERMINAL_OPEN=1 env var to enable pull without prompt
+    - Interactive prompt: Enter=skip, y=pull, n/quit=exit
+    """
+    # Check environment variables first (for non-interactive use)
+    if os.environ.get("SKIP_BLOOMBERG", "").lower() in ("true", "1", "yes"):
+        print("SKIP_BLOOMBERG detected, skipping Bloomberg pull...")
+        return False  # Skip pull, no prompt
     if os.environ.get("BLOOMBERG_TERMINAL_OPEN", "").lower() in ("true", "1", "yes"):
-        print("BLOOMBERG_TERMINAL_OPEN=True detected, skipping prompt...")
-        return True
+        print("BLOOMBERG_TERMINAL_OPEN=True detected, enabling Bloomberg pull...")
+        return True  # Pull enabled, no prompt
 
     # Interactive prompt
-    response = input("Do you have the Bloomberg terminal open in the background? [Y/n]: ")
-    if response.lower() in ('n', 'no'):
-        raise SystemExit(
-            "\nBloomberg Terminal not available. Exiting.\n"
-            "Tip: Set BLOOMBERG_TERMINAL_OPEN=True to skip this prompt."
-        )
-    return True
+    response = input("Bloomberg terminal open? [y/N/quit]: ").lower().strip()
+    if response in ('n', 'no', 'q', 'quit'):
+        raise SystemExit("Exiting.")
+    if response in ('y', 'yes'):
+        return True  # Pull enabled
+    # Default (Enter): skip pull but continue
+    print("Skipping Bloomberg pull, using existing data...")
+    return False
 
 
-_check_bloomberg_terminal()
+BLOOMBERG_AVAILABLE = _check_bloomberg_terminal()
 
 BASE_DIR = chartbook.env.get_project_root()
 DATA_DIR = BASE_DIR / "_data"
@@ -75,6 +85,13 @@ def task_config():
 
 def task_pull():
     """Pull Treasury yields and SF rates from Bloomberg."""
+    if not BLOOMBERG_AVAILABLE:
+        # Skip pull task when Bloomberg is not available
+        return {
+            "actions": [],
+            "verbosity": 2,
+            "task_dep": ["config"],
+        }
     return {
         "actions": ["python src/pull_bbg_treasury_sf.py"],
         "file_dep": ["src/pull_bbg_treasury_sf.py"],
@@ -119,7 +136,7 @@ def task_format():
 def task_run_notebooks():
     """Execute summary notebook and convert to HTML."""
     notebook_py = BASE_DIR / "src" / "summary_treasury_sf_basis_ipynb.py"
-    notebook_ipynb = NOTEBOOK_BUILD_DIR / "summary_treasury_sf_basis.ipynb"
+    notebook_ipynb = OUTPUT_DIR / "summary_treasury_sf_basis.ipynb"
 
     def run_notebook():
         # Convert py to ipynb
@@ -151,7 +168,7 @@ def task_generate_pipeline_site():
         "actions": ["chartbook build -f"],
         "file_dep": [
             "chartbook.toml",
-            NOTEBOOK_BUILD_DIR / "summary_treasury_sf_basis.ipynb",
+            OUTPUT_DIR / "summary_treasury_sf_basis.ipynb",
         ],
         "targets": [BASE_DIR / "docs" / "index.html"],
         "verbosity": 2,

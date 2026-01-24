@@ -1,0 +1,30 @@
+# Paper References for Treasury Spot-Futures Basis Module
+
+[Fleckenstein2020]
+title = "The Treasury Futures-Cash Basis"
+authors = "Matthias Fleckenstein and Francis A. Longstaff"
+year = 2020
+description = "The paper investigates the persistent basis in the interest rate futures market, attributing it to the cost of renting intermediary balance sheet space."
+empirical_facts = [
+    "The average funding basis in the interest rate futures market is 58.70 basis points, reaching up to 200 basis points during financial crises.",
+    "The funding basis is significantly related to the turn-of-the-year premium in Libor rates, indicating balance sheet usage costs.",
+    "Debt overhang costs and capital regulation are major factors influencing the funding basis throughout the 1991-2018 period.",
+]
+lessons_learned = [
+    "Intermediary balance sheet costs are crucial in explaining the mispricing of derivatives.",
+    "Debt overhang and capital regulation significantly impact balance sheet rental costs.",
+    "The cost of renting balance sheet space can resolve several asset pricing puzzles.",
+]
+data_sources = ["BIS reports", "Eurodollar futures prices", "Treasury note and Treasury note futures markets data"]
+
+[Barth2021]
+title = "Hedge Funds and the Treasury Cash-Futures Disconnect"
+authors = "Daniel Barth and R. Jay Kahn"
+year = 2021
+description = "The paper documents the rise of the Treasury cash-futures basis trade among hedge funds post-2016."
+empirical_facts = [
+    "Hedge fund Treasury exposure increased from $1.06 trillion to $2.02 trillion between 2017 and 2019.",
+    "The basis trade accounted for more than 60% of total hedge fund Treasury exposure at its peak.",
+    "In March 2020, hedge funds reduced short futures positions from $659 billion to $554 billion.",
+]
+data_sources = ["Regulatory datasets on hedge fund exposures", "Repo transaction data", "SEC Form PF"]

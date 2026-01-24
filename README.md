@@ -45,3 +45,20 @@ Results are in basis points.
 1. Ensure Bloomberg Terminal is running
 2. Install dependencies: `pip install -r requirements.txt`
 3. Run pipeline: `doit`
+
+## Academic References
+
+### Primary Papers
+
+- **Fleckenstein and Longstaff (2020)** - "The Treasury Futures-Cash Basis"
+  - Documents funding basis in interest rate futures market
+  - Average basis of 58.7 bps, up to 200 bps during crises
+
+- **Barth and Kahn (2021)** - "Hedge Funds and the Treasury Cash-Futures Disconnect"
+  - Documents rise of basis trade among hedge funds
+
+### Key Findings
+
+- Intermediary balance sheet costs drive futures-cash mispricing
+- Debt overhang and capital regulation significantly impact the basis
+- Basis widened dramatically in March 2020

@@ -29,6 +29,24 @@ is_publishable = true
 
 [charts]
 
+[charts.treasury_sf_basis]
+chart_name = "Treasury-SF Basis"
+short_description_chart = "Time series of Treasury-Secured Financing spreads by tenor"
+dataframe_id = "ftsfr_treasury_sf_basis"
+path_to_html_chart = "./_output/treasury_sf_basis.html"
+topic_tags = ["Treasury", "SOFR", "secured financing", "basis"]
+chart_docs_str = """
+## Treasury-Secured Financing Basis
+
+Time series plot showing the Treasury-Secured Financing (SF) basis spreads across different maturities (2Y, 5Y, 10Y, 20Y, 30Y).
+
+### Interpretation
+
+- Positive spreads indicate Treasuries yield more than SOFR-based financing
+- Negative spreads indicate SOFR-based financing yields more than Treasuries
+- Spread dynamics reflect repo market conditions and dealer balance sheet capacity
+"""
+
 [dataframes]
 
 [dataframes.ftsfr_treasury_sf_basis]

@@ -133,6 +133,22 @@ def task_format():
     }
 
 
+def task_generate_charts():
+    """Generate charts for Treasury-SF basis."""
+    return {
+        "actions": ["python src/plot_figure.py"],
+        "file_dep": [
+            "src/plot_figure.py",
+            DATA_DIR / "ftsfr_treasury_sf_basis.parquet",
+        ],
+        "targets": [
+            OUTPUT_DIR / "treasury_sf_basis.html",
+        ],
+        "verbosity": 2,
+        "task_dep": ["format"],
+    }
+
+
 def task_run_notebooks():
     """Execute summary notebook and convert to HTML."""
     notebook_py = BASE_DIR / "src" / "summary_treasury_sf_basis_ipynb.py"
@@ -169,8 +185,9 @@ def task_generate_pipeline_site():
         "file_dep": [
             "chartbook.toml",
             OUTPUT_DIR / "summary_treasury_sf_basis.ipynb",
+            OUTPUT_DIR / "treasury_sf_basis.html",
         ],
         "targets": [BASE_DIR / "docs" / "index.html"],
         "verbosity": 2,
-        "task_dep": ["run_notebooks"],
+        "task_dep": ["run_notebooks", "generate_charts"],
     }

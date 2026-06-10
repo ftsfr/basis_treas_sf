@@ -7,4 +7,7 @@ __pycache__/
 .ipynb_checkpoints/
 *.log
 .doit.db.db
+.doit.db
+.doit.db.*
 docs/
+src/*_ipynb.ipynb

@@ -11,3 +11,4 @@ __pycache__/
 .doit.db.*
 docs/
 src/*_ipynb.ipynb
+.DS_Store

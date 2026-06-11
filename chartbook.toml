@@ -3,19 +3,19 @@ type = "pipeline"
 chartbook_format_version = "0.0.2"
 
 [site]
-title = "Treasury-SF Basis"
+title = "Treasury Cash-Futures Basis"
 author = "Jeremy Bejarano"
-copyright = "2025"
+copyright = "2026"
 logo_path = ""
 favicon_path = ""
 
 [pipeline]
 id = "basis_treas_sf"
-pipeline_name = "Treasury-Secured Financing Basis"
-pipeline_description = "Treasury-SF basis measuring the spread between Treasury yields and SOFR-based secured financing rates"
+pipeline_name = "Treasury Cash-Futures Basis"
+pipeline_description = "Treasury cash-futures (spot-futures) basis: the implied repo rate from delivering the cheapest-to-deliver bond into Treasury futures, minus a maturity-matched OIS rate. Computed two ways: with Bloomberg's fixed-delivery-date implied repo, and with a delivery-timing-adjusted implied repo that lets the short deliver optimally within the delivery month (following Lord and Zhalilo)."
 lead_pipeline_developer = "Jeremy Bejarano"
-contributors = ["Jeremy Bejarano"]
-runs_on = "Windows/Linux/MacOS (requires Bloomberg)"
+contributors = ["Jeremy Bejarano", "George Lord", "Max Zhalilo"]
+runs_on = "Windows/Linux/MacOS (requires Bloomberg and WRDS)"
 git_repo_URL = "https://github.com/ftsfr/basis_treas_sf"
 README_file_path = "./README.md"
 
@@ -23,80 +23,298 @@ README_file_path = "./README.md"
 
 [notebooks.summary_treasury_sf_basis]
 notebook_name = "summary_treasury_sf_basis"
-notebook_description = "Summary statistics and visualization of Treasury-SF basis"
-notebook_path = "_output/summary_treasury_sf_basis.ipynb"
+notebook_description = "Summary statistics and visualization of the Treasury cash-futures basis under both methods"
+notebook_path = "_output/summary_treasury_sf_basis_ipynb.ipynb"
 is_publishable = true
 
 [charts]
 
 [charts.treasury_sf_basis]
-chart_name = "Treasury-SF Basis"
-short_description_chart = "Time series of Treasury-Secured Financing spreads by tenor"
+chart_name = "Treasury Cash-Futures Basis (Delivery-Adjusted)"
+short_description_chart = "Basis by tenor using the delivery-timing-adjusted implied repo (corrected method)"
 dataframe_id = "ftsfr_treasury_sf_basis"
 path_to_html_chart = "./_output/treasury_sf_basis.html"
-topic_tags = ["Treasury", "SOFR", "secured financing", "basis"]
+topic_tags = ["Treasury futures", "implied repo", "basis trade", "arbitrage", "fixed income"]
 chart_docs_str = """
-## Treasury-Secured Financing Basis
+## Treasury Cash-Futures Basis (Delivery-Adjusted)
 
-Time series plot showing the Treasury-Secured Financing (SF) basis spreads across different maturities (2Y, 5Y, 10Y, 20Y, 30Y).
+Time series of the Treasury cash-futures basis by tenor (2Y, 5Y, 10Y, 20Y, 30Y),
+computed as the delivery-timing-adjusted implied repo rate minus the OIS rate
+interpolated to the holding period, in basis points.
 
 ### Interpretation
 
-- Positive spreads indicate Treasuries yield more than SOFR-based financing
-- Negative spreads indicate SOFR-based financing yields more than Treasuries
-- Spread dynamics reflect repo market conditions and dealer balance sheet capacity
+- Basis < 0: the cash-and-carry trade (long CTD bond financed in repo, short
+  futures) earns less than OIS; a *short* basis position (short the bond,
+  long futures) earns a premium. Persistent deviations reflect dealer
+  balance-sheet costs and segmented funding markets.
+- Basis > 0: the cash-and-carry trade earns more than OIS.
+- Spikes coincide with funding stress (e.g., March 2020).
+
+The delivery-adjusted implied repo maximizes the cash-and-carry return over
+candidate delivery dates within the delivery month, reflecting the timing
+option owned by the futures short.
+"""
+
+[charts.treasury_sf_basis_bbg]
+chart_name = "Treasury Cash-Futures Basis (Bloomberg Implied Repo)"
+short_description_chart = "Basis by tenor using Bloomberg's FUT_IMPLIED_REPO_RT (old method)"
+dataframe_id = "ftsfr_treasury_sf_basis_bbg"
+path_to_html_chart = "./_output/treasury_sf_basis_bbg.html"
+topic_tags = ["Treasury futures", "implied repo", "basis trade", "Bloomberg", "fixed income"]
+chart_docs_str = """
+## Treasury Cash-Futures Basis (Bloomberg Implied Repo)
+
+Time series of the Treasury cash-futures basis by tenor (2Y, 5Y, 10Y, 20Y, 30Y),
+computed as Bloomberg's implied repo rate on the first-deferred futures
+contract minus the OIS rate interpolated to the contract's time-to-maturity,
+in basis points.
+
+### Caveat: fixed delivery-date assumption
+
+Bloomberg's `FUT_IMPLIED_REPO_RT` computes the cash-and-carry return assuming
+delivery on a fixed date (the last delivery day). The futures short, however,
+owns the delivery timing option: when carry is negative (financing cost
+exceeds coupon income), early delivery is optimal. Fixing the delivery date
+therefore understates the implied repo in negative-carry environments, which
+biases this version of the basis downward relative to the delivery-adjusted
+series.
+"""
+
+[charts.treasury_sf_basis_comparison]
+chart_name = "Treasury Cash-Futures Basis: Method Comparison"
+short_description_chart = "Delivery-adjusted vs Bloomberg-method basis, one panel per tenor"
+dataframe_id = "ftsfr_treasury_sf_basis"
+path_to_html_chart = "./_output/treasury_sf_basis_comparison.html"
+topic_tags = ["Treasury futures", "implied repo", "basis trade", "delivery option", "fixed income"]
+chart_docs_str = """
+## Method Comparison: Delivery-Adjusted vs Bloomberg Implied Repo
+
+Overlay of the two basis constructions, one panel per tenor. Because the
+delivery-adjusted implied repo maximizes over candidate delivery dates, it is
+weakly greater than an implied repo computed at any fixed delivery date; the
+delivery-adjusted basis therefore sits (weakly) above the Bloomberg-method
+basis, with the gap widening when carry is negative and the optimal delivery
+moves to the front of the delivery window.
 """
 
 [dataframes]
 
 [dataframes.ftsfr_treasury_sf_basis]
 dataframe_name = "ftsfr_treasury_sf_basis"
-short_description_df = "Daily Treasury-SF basis spreads for 5 tenors"
-data_sources = ["Bloomberg Treasury Yields", "Bloomberg SOFR OIS Rates"]
+short_description_df = "Daily Treasury cash-futures basis (delivery-adjusted implied repo minus OIS) for 5 tenors"
+data_sources = ["Bloomberg Treasury futures", "Bloomberg USD OIS", "CRSP Daily Treasury (WRDS)"]
+data_providers = ["Bloomberg", "CRSP/WRDS"]
+need_to_contact_provider = ["no", "no"]
+data_on_pre_approved_list = ["No", "No"]
+links_to_data_providers = ["https://bloomberg.com", "https://wrds-www.wharton.upenn.edu"]
+topic_tags = ["Treasury futures", "implied repo", "basis trade", "arbitrage", "fixed income"]
+type_of_data_access = ["Bloomberg Terminal", "WRDS subscription"]
+data_license = "Bloomberg; CRSP"
+license_expiration_date = ""
+provider_contact_info = ""
+restriction_on_use = "No"
+how_is_pulled = "Futures and OIS pulled from Bloomberg via xbbg; CTD bond prices pulled from CRSP via WRDS"
+path_to_parquet_data = "./_data/ftsfr_treasury_sf_basis.parquet"
+path_to_excel_data = ""
+date_col = "ds"
+dataframe_docs_str = """
+## Treasury Cash-Futures Basis (Delivery-Adjusted)
+
+Daily Treasury cash-futures basis in basis points, computed with a
+delivery-timing-adjusted implied repo rate. Implementation follows
+George Lord and Max Zhalilo
+([maxz073/p10_Siriwardane_et_al_2026](https://github.com/maxz073/p10_Siriwardane_et_al_2026)),
+which replicates the Treasury spot-futures appendix of Siriwardane,
+Sunderam, and Wallen (2023), "Segmented Arbitrage."
+
+### Columns
+
+| Column | Description |
+|--------|-------------|
+| unique_id | Tenor identifier (Treasury_SF_2Y, ..., Treasury_SF_30Y) |
+| ds | Date |
+| y | Basis spread in basis points |
+
+### The trade
+
+Buy the cheapest-to-deliver (CTD) Treasury, finance it in repo, and sell the
+futures contract. At delivery the short receives the invoice price
+$F \\cdot CF + A_e$. The break-even financing rate of this cash-and-carry
+position is the implied repo rate (IRR).
+
+### Implied repo rate
+
+For trade date $t$ (settlement $t_s = t + 1$ business day) and candidate
+delivery date $T_d$:
+
+$$
+\\text{IRR}(T_d) = \\frac{F \\cdot CF + A_e + I_c - (P + A_b)}
+{(P + A_b)\\, d_1 - I_c\\, d_2}
+$$
+
+where
+
+| Symbol | Meaning |
+|--------|---------|
+| $F$ | Futures price (first-deferred generic contract, `PX_LAST`) |
+| $CF$ | Conversion factor of the CTD bond (`FUT_CNVS_FACTOR`) |
+| $P$ | CTD clean price (CRSP bid/ask midpoint) |
+| $A_b$ | Accrued interest at settlement $t_s$ |
+| $A_e$ | Accrued interest at delivery $T_d$ |
+| $I_c$ | Intervening coupon ($c/2$ if a coupon date falls in the holding period, else 0) |
+| $d_1$ | $(T_d - t_s)/360$ : settlement-to-delivery period (Act/360) |
+| $d_2$ | $(T_d - T_{cpn})/360$ : coupon-to-delivery reinvestment period (Act/360) |
+
+Accrued interest uses the Treasury Act/Act convention,
+$A = \\frac{c}{2} \\cdot \\frac{\\text{days since last coupon}}{\\text{days in coupon period}}$,
+with the semiannual coupon schedule stepped backward from the maturity date.
+
+### Delivery-timing optimization
+
+The futures short owns the delivery timing option. The implied repo is
+maximized over candidate delivery dates within the delivery month:
+
+$$
+\\text{IRR}^* = \\max_{T_d \\in \\mathcal{D}} \\text{IRR}(T_d), \\quad
+\\mathcal{D} = \\{T_{first},\\ T_{last}\\} \\cup
+\\{T_{cpn},\\ T_{cpn}^{ex}\\} \\cap [T_{first}, T_{last}]
+$$
+
+where $T_{first}$/$T_{last}$ are the first/last weekdays of the contract
+month (proxy for the CME delivery window) and $T_{cpn}$/$T_{cpn}^{ex}$ are
+the CTD coupon date and its ex-coupon date. Intuition: with positive carry
+(coupon income > financing cost) the short delivers late; with negative
+carry the short delivers early. Bloomberg's fixed-date implied repo misses
+this and understates IRR whenever the fixed date is not optimal.
+
+### Financing benchmark and basis
+
+The OIS rate is linearly interpolated (in days) to the optimal holding
+period $h = T_d^* - t_s$ across the available USD OIS curve points
+(1M, 2M, 3M, 4M, 5M, 6M, 9M, 1Y as available; Lord and Zhalilo used 2M-9M):
+
+$$
+y = \\text{IRR}^* - \\text{OIS}(h) \\quad \\text{(bps)}
+$$
+
+### Cleaning
+
+- Futures observations require positive aggregate volume.
+- The IRR series is smoothed with a 5-day centered rolling median to dampen
+  day-count and price noise (per Lord and Zhalilo).
+
+### Series
+
+| unique_id | Futures contract | Deliverable basket |
+|-----------|------------------|--------------------|
+| Treasury_SF_2Y | TU (2Y note) | 1y9m-2y notes |
+| Treasury_SF_5Y | FV (5Y note) | 4y2m-5y3m notes |
+| Treasury_SF_10Y | TY (10Y note) | 6.5y-10y notes |
+| Treasury_SF_20Y | US (classic bond) | 15y-25y bonds |
+| Treasury_SF_30Y | WN (Ultra Bond) | 25y+ bonds |
+
+Note: Lord and Zhalilo's repository labels WN as 20Y and US as 30Y; this
+pipeline follows the Siriwardane et al. convention above (US=20Y, WN=30Y),
+consistent with the deliverable baskets.
+
+### Known approximations
+
+- The delivery window is proxied by the first/last weekday of the contract
+  month. (At CME, the last delivery day for TU/FV extends three business
+  days into the following month; delivery days are exchange business days.)
+- The CTD bond is taken from Bloomberg's `FUT_CTD_CUSIP`; the quality
+  (CTD-switch) option and end-of-month/wildcard options are not valued.
+- The coupon schedule is derived from the maturity date assuming semiannual
+  ACT/ACT coupons (CRSP does not provide the schedule directly).
+
+### Data Sources
+
+- Bloomberg: first-deferred Treasury futures (TU2, FV2, TY2, US2, WN2) -
+  `PX_LAST`, `FUT_AGGTE_VOL`, `FUT_CTD_CUSIP`, `FUT_CNVS_FACTOR`,
+  `CURRENT_CONTRACT_MONTH_YR`; USD OIS (USSO* tickers)
+- CRSP/WRDS: `crspm.tfz_dly` joined to `crspm.tfz_iss` for CTD bond clean
+  prices (bid/ask mid), accrued interest, coupon rates, and maturity dates
+"""
+
+[dataframes.ftsfr_treasury_sf_basis_bbg]
+dataframe_name = "ftsfr_treasury_sf_basis_bbg"
+short_description_df = "Daily Treasury cash-futures basis (Bloomberg implied repo minus OIS) for 5 tenors"
+data_sources = ["Bloomberg Treasury futures", "Bloomberg USD OIS"]
 data_providers = ["Bloomberg"]
 need_to_contact_provider = ["no"]
 data_on_pre_approved_list = ["No"]
 links_to_data_providers = ["https://bloomberg.com"]
-topic_tags = ["Treasury", "SOFR", "secured financing", "basis", "fixed income"]
+topic_tags = ["Treasury futures", "implied repo", "basis trade", "Bloomberg", "fixed income"]
 type_of_data_access = ["Bloomberg Terminal"]
 data_license = "Bloomberg"
 license_expiration_date = ""
 provider_contact_info = ""
 restriction_on_use = "No"
 how_is_pulled = "Pulled from Bloomberg via xbbg"
-path_to_parquet_data = "./_data/ftsfr_treasury_sf_basis.parquet"
+path_to_parquet_data = "./_data/ftsfr_treasury_sf_basis_bbg.parquet"
 path_to_excel_data = ""
 date_col = "ds"
 dataframe_docs_str = """
-## Treasury-SF Basis
+## Treasury Cash-Futures Basis (Bloomberg Implied Repo)
 
-Treasury-Secured Financing basis spreads in basis points.
+Daily Treasury cash-futures basis in basis points, using Bloomberg's own
+implied repo field. This is the "old" method; it is retained for comparison
+with the delivery-adjusted series (`ftsfr_treasury_sf_basis`).
 
 ### Columns
 
 | Column | Description |
 |--------|-------------|
-| unique_id | Tenor identifier (e.g., Treasury_SF_2Y, Treasury_SF_10Y) |
+| unique_id | Tenor identifier (Treasury_SF_2Y, ..., Treasury_SF_30Y) |
 | ds | Date |
 | y | Basis spread in basis points |
 
 ### Methodology
 
+For each tenor, using the first-deferred generic futures contract:
+
 $$
-\\text{Basis} = (\\text{Treasury Yield} - \\text{SOFR OIS Rate}) \\times 100
+y = \\left( \\text{FUT\\_IMPLIED\\_REPO\\_RT} - \\text{OIS}(TTM) \\right)
+\\times 100
 $$
 
-### Interpretation
+- `FUT_IMPLIED_REPO_RT` is Bloomberg's cash-and-carry return of the CTD
+  bond, in percent. It assumes delivery on a fixed date (the last delivery
+  day of the contract month), ignoring the short's delivery timing option.
+- $TTM$ is days from the observation date to the last observed business day
+  of the contract month.
+- $\\text{OIS}(TTM)$ is piecewise-linear in days across the 1W, 1M, 3M, 6M,
+  and 1Y USD OIS rates:
 
-- Basis > 0: Treasuries yield more than SOFR-based financing
-- Basis < 0: SOFR-based financing yields more than Treasuries
-- Basis = 0: No spread
+$$
+\\text{OIS}(TTM) =
+\\begin{cases}
+\\text{OIS}_{1W} & TTM \\le 7 \\\\
+\\frac{30-TTM}{23}\\,\\text{OIS}_{1W} + \\frac{TTM-7}{23}\\,\\text{OIS}_{1M} & 7 < TTM \\le 30 \\\\
+\\frac{90-TTM}{60}\\,\\text{OIS}_{1M} + \\frac{TTM-30}{60}\\,\\text{OIS}_{3M} & 30 < TTM \\le 90 \\\\
+\\frac{180-TTM}{90}\\,\\text{OIS}_{3M} + \\frac{TTM-90}{90}\\,\\text{OIS}_{6M} & 90 < TTM \\le 180 \\\\
+\\frac{360-TTM}{180}\\,\\text{OIS}_{6M} + \\frac{TTM-180}{180}\\,\\text{OIS}_{1Y} & TTM > 180
+\\end{cases}
+$$
+
+### Cleaning
+
+- Outliers removed when the absolute deviation from the +/- 45-day rolling
+  median exceeds 10 times the window's mean absolute deviation (per tenor).
+- Observations require volume in the deferred contract.
+- Gaps forward-filled up to 5 business days.
+- Sample begins 2004-06-23 (Bloomberg implied repo coverage is unreliable
+  before mid-2004).
 
 ### Series
 
-Treasury_SF_2Y, Treasury_SF_5Y, Treasury_SF_10Y, Treasury_SF_20Y, Treasury_SF_30Y
+Treasury_SF_2Y (TU), Treasury_SF_5Y (FV), Treasury_SF_10Y (TY),
+Treasury_SF_20Y (US), Treasury_SF_30Y (WN)
 
 ### Data Source
 
-Bloomberg Treasury constant maturity yields (USGG series) and SOFR OIS swap rates (USOSFR series)
+Bloomberg first-deferred Treasury futures (`FUT_IMPLIED_REPO_RT`,
+`FUT_AGGTE_VOL`, `CURRENT_CONTRACT_MONTH_YR`) and USD OIS rates
+(USSO1Z, USSOA, USSOC, USSOF, USSO1)
 """

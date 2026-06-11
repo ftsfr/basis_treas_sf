@@ -1,9 +1,22 @@
 # Paper References for Treasury Spot-Futures Basis Module
 
+[Siriwardane2023]
+title = "Segmented Arbitrage"
+authors = "Emil Siriwardane, Adi Sunderam, and Jonathan Wallen"
+year = 2023
+description = "Documents that arbitrage spreads across markets (including the Treasury spot-futures basis) co-move within funding segments rather than as a single intermediary factor. The Treasury spot-futures spread construction replicated in this pipeline (implied repo on the first-deferred futures contract minus maturity-matched OIS) is from this paper's appendix."
+empirical_facts = [
+    "Arbitrage spreads are highly segmented: average pairwise correlations across 29 spreads are low, inconsistent with a single intermediary marginal value of wealth.",
+    "Treasury spot-futures arbitrage spreads are computed per tenor (2Y, 5Y, 10Y, 20Y, 30Y) as implied repo minus OIS.",
+    "Funding and balance-sheet segmentation across intermediaries drives co-movement within strategy families.",
+]
+data_sources = ["Bloomberg Treasury futures and OIS data", "CRSP Treasury quotes"]
+
 [Fleckenstein2020]
-title = "The Treasury Futures-Cash Basis"
+title = "Renting Balance Sheet Space: Intermediary Balance Sheet Rental Costs and the Valuation of Derivatives"
 authors = "Matthias Fleckenstein and Francis A. Longstaff"
 year = 2020
+journal = "The Review of Financial Studies 33(11), 5051-5091"
 description = "The paper investigates the persistent basis in the interest rate futures market, attributing it to the cost of renting intermediary balance sheet space."
 empirical_facts = [
     "The average funding basis in the interest rate futures market is 58.70 basis points, reaching up to 200 basis points during financial crises.",

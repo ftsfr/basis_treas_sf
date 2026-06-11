@@ -1,157 +1,173 @@
+# ---
+# jupyter:
+#   jupytext:
+#     text_representation:
+#       extension: .py
+#       format_name: percent
+#       format_version: '1.3'
+#       jupytext_version: 1.18.1
+#   kernelspec:
+#     display_name: Python 3
+#     language: python
+#     name: python3
+# ---
+
+# %% [markdown]
+# # Treasury Cash-Futures Basis Summary
+#
+# The Treasury cash-futures basis trade buys a deliverable Treasury (the
+# cheapest-to-deliver, or CTD, bond), finances it in repo, and sells the
+# corresponding Treasury futures contract, locking in the futures invoice
+# price at delivery. The return earned by carrying the bond to delivery is
+# the **implied repo rate (IRR)**. The arbitrage spread compares this
+# implied repo to a maturity-matched OIS rate:
+#
+# $$\text{Basis} = \text{IRR} - \text{OIS} \quad \text{(bps)}$$
+#
+# This pipeline computes the basis two ways:
+#
+# 1. **Delivery-adjusted (corrected) method** — computes the IRR from CTD
+#    bond prices (CRSP) and futures prices, *choosing the delivery date
+#    optimally* within the delivery month, the way the short who owns the
+#    timing option would. Implemented following George Lord and Max Zhalilo
+#    (https://github.com/maxz073/p10_Siriwardane_et_al_2026).
+# 2. **Bloomberg method** — uses Bloomberg's `FUT_IMPLIED_REPO_RT`, which
+#    assumes a fixed delivery date. When carry is negative (financing cost
+#    exceeds coupon income), the short prefers to deliver *early*, and the
+#    fixed-date assumption understates the implied repo.
+
 # %%
-"""
-# Treasury-Secured Financing Basis Summary
-
-Treasury-SF basis measuring the spread between Treasury yields and SOFR-based secured financing rates.
-"""
-
-# %%
-import sys
-sys.path.insert(0, "./src")
-
-import pandas as pd
 import matplotlib.pyplot as plt
-import seaborn as sns
+import pandas as pd
 
-import chartbook
+from settings import config
 
-BASE_DIR = chartbook.env.get_project_root()
-DATA_DIR = BASE_DIR / "_data"
+DATA_DIR = config("DATA_DIR")
+OUTPUT_DIR = config("OUTPUT_DIR")
 
-# %%
-"""
-## Methodology
-
-The Treasury-SF basis is calculated as:
-
-$$
-\\text{Basis} = (\\text{Treasury Yield} - \\text{SOFR OIS Rate}) \\times 100
-$$
-
-Results are expressed in basis points.
-
-### Interpretation
-
-- **Basis > 0**: Treasuries yield more than SOFR-based financing
-- **Basis < 0**: SOFR-based financing yields more than Treasuries
-- **Basis = 0**: No spread
-
-### Data Sources
-
-- Bloomberg Treasury constant maturity yields (USGG series)
-- Bloomberg SOFR OIS swap rates (USOSFR series)
-"""
+# %% [markdown]
+# ## Data Overview
 
 # %%
-"""
-## Data Overview
-"""
+df_adj = pd.read_parquet(DATA_DIR / "ftsfr_treasury_sf_basis.parquet")
+df_bbg = pd.read_parquet(DATA_DIR / "ftsfr_treasury_sf_basis_bbg.parquet")
+
+print("Delivery-adjusted method:")
+print(f"  Records: {len(df_adj):,}")
+print(f"  Date range: {df_adj['ds'].min().date()} to {df_adj['ds'].max().date()}")
+print(f"  Series: {sorted(df_adj['unique_id'].unique())}")
+print("Bloomberg method:")
+print(f"  Records: {len(df_bbg):,}")
+print(f"  Date range: {df_bbg['ds'].min().date()} to {df_bbg['ds'].max().date()}")
 
 # %%
-df = pd.read_parquet(DATA_DIR / "ftsfr_treasury_sf_basis.parquet")
-print(f"Shape: {df.shape}")
-print(f"Columns: {df.columns.tolist()}")
-print(f"\nDate range: {df['ds'].min()} to {df['ds'].max()}")
-print(f"Number of series: {df['unique_id'].nunique()}")
+adj_wide = df_adj.pivot(index="ds", columns="unique_id", values="y")
+bbg_wide = df_bbg.pivot(index="ds", columns="unique_id", values="y")
+
+# %% [markdown]
+# ### Summary Statistics (bps)
 
 # %%
-print("\nSeries:")
-for series in sorted(df['unique_id'].unique()):
-    print(f"  {series}")
+stats = pd.concat(
+    {
+        "Delivery-adjusted": adj_wide.describe().T[["count", "mean", "std", "min", "max"]],
+        "Bloomberg": bbg_wide.describe().T[["count", "mean", "std", "min", "max"]],
+    },
+    axis=1,
+)
+stats.round(2)
+
+# %% [markdown]
+# The delivery-adjusted basis is systematically *above* the Bloomberg-method
+# basis. This is the delivery option at work: the corrected IRR maximizes
+# over candidate delivery dates, so it is weakly greater than an IRR computed
+# at any fixed delivery date.
 
 # %%
-"""
-### Summary Statistics
-"""
+diff = (adj_wide - bbg_wide).dropna(how="all")
+diff.describe().T[["count", "mean", "std", "min", "max"]].round(2)
+
+# %% [markdown]
+# ### Basis Time Series: Both Methods by Tenor
 
 # %%
-basis_wide = df.pivot(index='ds', columns='unique_id', values='y')
-basis_stats = basis_wide.describe().T
-basis_stats['skewness'] = basis_wide.skew()
-basis_stats['kurtosis'] = basis_wide.kurtosis()
-print(basis_stats[['mean', 'std', 'min', 'max', 'skewness', 'kurtosis']].round(2).to_string())
+tenors = ["2Y", "5Y", "10Y", "20Y", "30Y"]
+fig, axes = plt.subplots(len(tenors), 1, figsize=(14, 18), sharex=True)
+for ax, tenor in zip(axes, tenors):
+    col = f"Treasury_SF_{tenor}"
+    if col in adj_wide.columns:
+        ax.plot(adj_wide.index, adj_wide[col], label="Delivery-adjusted",
+                color="C0", linewidth=0.9)
+    if col in bbg_wide.columns:
+        ax.plot(bbg_wide.index, bbg_wide[col], label="Bloomberg implied repo",
+                color="C3", linewidth=0.9, alpha=0.7)
+    ax.axhline(0, color="black", linestyle="--", alpha=0.5)
+    ax.set_title(f"{tenor} tenor")
+    ax.set_ylabel("Basis (bps)")
+    ax.legend(loc="lower left")
+    ax.grid(True, alpha=0.3)
+plt.tight_layout()
+plt.savefig(OUTPUT_DIR / "treasury_sf_basis_comparison.png", dpi=150,
+            bbox_inches="tight")
+plt.show()
+
+# %% [markdown]
+# ### Optimal Holding Period
+#
+# The corrected method records the holding period implied by the winning
+# delivery date. Sawtooth jumps between the start and the end of the
+# delivery window are the delivery option switching between early delivery
+# (negative carry) and late delivery (positive carry).
 
 # %%
-"""
-### Treasury-SF Basis Time Series
-"""
-
-# %%
-fig, ax = plt.subplots(figsize=(14, 8))
-
-for col in basis_wide.columns:
-    ax.plot(basis_wide.index, basis_wide[col], label=col, alpha=0.8, linewidth=1)
-
-ax.axhline(y=0, color='black', linestyle='--', alpha=0.5)
-ax.set_xlabel('Date')
-ax.set_ylabel('Basis (bps)')
-ax.set_title('Treasury-SF Basis (Treasury Yield - SOFR OIS Rate)')
-ax.legend()
+holding = pd.read_parquet(DATA_DIR / "holding_period_days.parquet").set_index("Date")
+fig, ax = plt.subplots(figsize=(14, 5))
+for tenor in tenors:
+    if tenor in holding.columns:
+        ax.plot(holding.index, holding[tenor], label=tenor, linewidth=0.8)
+ax.set_ylabel("Holding period (days)")
+ax.set_title("Optimal Holding Period by Tenor (settlement to optimal delivery)")
+ax.legend(title="Tenor")
 ax.grid(True, alpha=0.3)
-
 plt.tight_layout()
-plt.savefig(DATA_DIR.parent / "_output" / "treasury_sf_basis.png", dpi=150, bbox_inches='tight')
 plt.show()
 
-# %%
-"""
-### Term Structure of Treasury-SF Basis
-"""
+# %% [markdown]
+# ### Method Difference: Delivery-Adjusted Minus Bloomberg
 
 # %%
-# Plot most recent term structure
-fig, ax = plt.subplots(figsize=(10, 6))
-
-# Get most recent values
-latest = basis_wide.iloc[-1]
-tenors = [2, 5, 10, 20, 30]
-values = [latest.get(f'Treasury_SF_{t}Y', None) for t in tenors]
-
-ax.plot(tenors, values, 'o-', linewidth=2, markersize=8)
-ax.axhline(y=0, color='black', linestyle='--', alpha=0.5)
-ax.set_xlabel('Tenor (Years)')
-ax.set_ylabel('Basis (bps)')
-ax.set_title(f'Treasury-SF Basis Term Structure ({basis_wide.index[-1].strftime("%Y-%m-%d")})')
-ax.set_xticks(tenors)
+fig, ax = plt.subplots(figsize=(14, 5))
+for tenor in tenors:
+    col = f"Treasury_SF_{tenor}"
+    if col in diff.columns:
+        ax.plot(diff.index, diff[col].rolling(21).mean(), label=tenor, linewidth=0.9)
+ax.axhline(0, color="black", linestyle="--", alpha=0.5)
+ax.set_ylabel("Difference (bps, 21-day MA)")
+ax.set_title("Delivery-Adjusted Basis Minus Bloomberg-Method Basis")
+ax.legend(title="Tenor")
 ax.grid(True, alpha=0.3)
-
 plt.tight_layout()
-plt.savefig(DATA_DIR.parent / "_output" / "treasury_sf_basis_term.png", dpi=150, bbox_inches='tight')
 plt.show()
 
-# %%
-"""
-### Correlation Matrix
-"""
+# %% [markdown]
+# ## Data Definitions
+#
+# ### ftsfr_treasury_sf_basis / ftsfr_treasury_sf_basis_bbg
+#
+# | Variable | Description |
+# |----------|-------------|
+# | unique_id | Tenor identifier (e.g., Treasury_SF_2Y, Treasury_SF_10Y) |
+# | ds | Date |
+# | y | Basis spread in basis points |
+#
+# ### Series
+#
+# | Code | Futures contract | Description |
+# |------|------------------|-------------|
+# | Treasury_SF_2Y | TU (2Y note) | 2-Year cash-futures basis |
+# | Treasury_SF_5Y | FV (5Y note) | 5-Year cash-futures basis |
+# | Treasury_SF_10Y | TY (10Y note) | 10-Year cash-futures basis |
+# | Treasury_SF_20Y | US (classic bond) | 20-Year cash-futures basis |
+# | Treasury_SF_30Y | WN (Ultra Bond) | 30-Year cash-futures basis |
 
 # %%
-fig, ax = plt.subplots(figsize=(10, 8))
-corr = basis_wide.corr()
-sns.heatmap(corr, annot=True, fmt='.2f', cmap='RdBu_r', center=0, ax=ax)
-ax.set_title('Treasury-SF Basis Correlations')
-plt.tight_layout()
-plt.savefig(DATA_DIR.parent / "_output" / "treasury_sf_basis_correlation.png", dpi=150, bbox_inches='tight')
-plt.show()
-
-# %%
-"""
-## Data Definitions
-
-### Treasury-SF Basis (ftsfr_treasury_sf_basis)
-
-| Variable | Description |
-|----------|-------------|
-| unique_id | Tenor identifier (e.g., Treasury_SF_2Y, Treasury_SF_10Y) |
-| ds | Date |
-| y | Basis spread in basis points |
-
-### Series
-
-| Code | Description |
-|------|-------------|
-| Treasury_SF_2Y | 2-Year Treasury-SF basis |
-| Treasury_SF_5Y | 5-Year Treasury-SF basis |
-| Treasury_SF_10Y | 10-Year Treasury-SF basis |
-| Treasury_SF_20Y | 20-Year Treasury-SF basis |
-| Treasury_SF_30Y | 30-Year Treasury-SF basis |
-"""

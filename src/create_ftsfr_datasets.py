@@ -1,50 +1,60 @@
 """
-Create FTSFR standardized datasets for Treasury-SF basis.
+Create FTSFR standardized datasets for the Treasury cash-futures basis.
 
-Outputs:
-- ftsfr_treasury_sf_basis.parquet: Treasury-SF basis spreads in basis points
+Outputs (long format: unique_id, ds, y):
+- ``ftsfr_treasury_sf_basis.parquet``: delivery-adjusted basis (corrected
+  method; implied repo with optimal delivery timing minus OIS at the holding
+  period)
+- ``ftsfr_treasury_sf_basis_bbg.parquet``: Bloomberg-method basis
+  (FUT_IMPLIED_REPO_RT minus OIS interpolated to contract maturity)
 """
-
-import sys
-from pathlib import Path
-
-sys.path.insert(0, "./src")
 
 import pandas as pd
 
-import chartbook
-import calc_treasury_sf_basis
+from settings import config
+import calc_basis_bloomberg
+import calc_basis_delivery_adjusted
 
-BASE_DIR = chartbook.env.get_project_root()
-DATA_DIR = BASE_DIR / "_data"
+DATA_DIR = config("DATA_DIR")
+
+
+def to_ftsfr_long(df_wide: pd.DataFrame) -> pd.DataFrame:
+    """Convert a wide basis DataFrame (Date + Treasury_SF_* columns) to
+    FTSFR long format (unique_id, ds, y)."""
+    df = df_wide.copy()
+    df["Date"] = pd.to_datetime(df["Date"])
+    df = df.set_index("Date")
+    df_stacked = df.stack().reset_index()
+    df_stacked.columns = ["ds", "unique_id", "y"]
+    df_stacked = df_stacked[["unique_id", "ds", "y"]]
+    df_stacked["ds"] = pd.to_datetime(df_stacked["ds"])
+    df_stacked = df_stacked.dropna()
+    return df_stacked.sort_values(by=["unique_id", "ds"]).reset_index(drop=True)
 
 
 def main():
     DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-    print(">> Creating ftsfr_treasury_sf_basis...")
-
-    # Calculate basis spreads
-    df_all = calc_treasury_sf_basis.calculate_treasury_sf_basis(data_dir=DATA_DIR)
-
-    # Convert from wide to long format
-    df_stacked = df_all.stack().reset_index()
-    df_stacked.columns = ["ds", "unique_id", "y"]
-
-    # Reorder columns to FTSFR standard: unique_id, ds, y
-    df_stacked = df_stacked[["unique_id", "ds", "y"]]
-    df_stacked["ds"] = pd.to_datetime(df_stacked["ds"])
-
-    # Clean up
-    df_stacked = df_stacked.dropna()
-    df_stacked = df_stacked.sort_values(by=["unique_id", "ds"]).reset_index(drop=True)
-
-    # Save
-    output_path = DATA_DIR / "ftsfr_treasury_sf_basis.parquet"
-    df_stacked.to_parquet(output_path, index=False)
-    print(f"   Saved: {output_path.name}")
-    print(f"   Records: {len(df_stacked):,}")
-    print(f"   Series: {df_stacked['unique_id'].nunique()}")
+    for label, loader, out_name in [
+        (
+            "delivery-adjusted",
+            calc_basis_delivery_adjusted.load_basis_adj,
+            "ftsfr_treasury_sf_basis.parquet",
+        ),
+        (
+            "Bloomberg-method",
+            calc_basis_bloomberg.load_basis_bbg,
+            "ftsfr_treasury_sf_basis_bbg.parquet",
+        ),
+    ]:
+        df_wide = loader(data_dir=DATA_DIR)
+        df_long = to_ftsfr_long(df_wide)
+        output_path = DATA_DIR / out_name
+        df_long.to_parquet(output_path, index=False)
+        print(
+            f">> Saved {out_name} ({label}): {len(df_long):,} records, "
+            f"{df_long['unique_id'].nunique()} series"
+        )
 
 
 if __name__ == "__main__":

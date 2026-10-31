@@ -10,7 +10,7 @@ repo_url = "https://github.com/ftsfr/basis_treas_sf"
 os_compatibility = [
     "Windows/Linux/MacOS (requires Bloomberg and WRDS)",
 ]
-requires_chartbook = ">=0.3.0"
+requires_chartbook = ">=0.4.0"
 
 [scripts]
 build = "doit"

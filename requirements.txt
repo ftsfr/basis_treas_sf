@@ -1,4 +1,4 @@
-chartbook>=0.3.0
+chartbook>=0.4.0
 doit==0.36.0
 pandas==2.2.3
 numpy==1.26.4
